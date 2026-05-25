@@ -28,7 +28,7 @@ echo "      IP: ${CURRENT_IP}  Domain: ${MAGIC_DOMAIN}"
 # 3. Write a clean base nginx.conf for the new domain
 #    certbot will add SSL directives on top of this in the next step
 echo "[3/7] Writing base nginx config for ${MAGIC_DOMAIN}..."
-cat > /etc/nginx/nginx.conf << NGINXEOF
+sudo tee /etc/nginx/nginx.conf > /dev/null << NGINXEOF
 user nginx;
 worker_processes auto;
 error_log /var/log/nginx/error.log notice;
@@ -86,13 +86,13 @@ http {
 }
 NGINXEOF
 
-nginx -t && systemctl restart nginx
+sudo nginx -t && sudo systemctl restart nginx
 echo "      Nginx restarted with base config."
 
 # 4. Request a fresh SSL certificate for the new nip.io domain
 #    --redirect makes certbot automatically add the HTTP→HTTPS redirect block
 echo "[4/7] Requesting Let's Encrypt certificate for ${MAGIC_DOMAIN}..."
-certbot --nginx \
+sudo certbot --nginx \
   -d "${MAGIC_DOMAIN}" \
   --non-interactive \
   --agree-tos \
@@ -111,8 +111,8 @@ echo "      Frontend built."
 
 # 6. Copy fresh static files to Nginx
 echo "[6/7] Deploying frontend to Nginx..."
-rm -rf /usr/share/nginx/html/*
-cp -r dist/* /usr/share/nginx/html/
+sudo rm -rf /usr/share/nginx/html/*
+sudo cp -r dist/* /usr/share/nginx/html/
 echo "      Frontend deployed."
 
 # 7. Restart Node.js API (kill zombies first, then nohup in background)
