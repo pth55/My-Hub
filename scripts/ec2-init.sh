@@ -83,10 +83,10 @@ log "Step 8/10 — Setting up Docker registry with persistent storage"
 mkdir -p "$REGISTRY_DATA"
 
 # Stop and remove any existing container before re-creating
-docker stop private_hub 2>/dev/null || true
-docker rm   private_hub 2>/dev/null || true
+sudo docker stop private_hub 2>/dev/null || true
+sudo docker rm   private_hub 2>/dev/null || true
 
-docker run -d \
+sudo docker run -d \
   -p 5000:5000 \
   --restart unless-stopped \
   --name private_hub \
