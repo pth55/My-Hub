@@ -1,0 +1,147 @@
+=========================================================
+  PRIVATE DOCKER HUB — ADMIN COMMAND REFERENCE
+  (Run all commands on the EC2 instance via SSH)
+=========================================================
+
+--- QUICK: FULL MANUAL RESTART ---
+# If something breaks after a reboot, run the startup script manually
+bash /home/ec2-user/startup.sh
+
+--- 1. FRONTEND (REACT UI) ---
+# Fix ownership if a previous sudo build broke permissions
+sudo chown -R ec2-user:ec2-user /home/ec2-user/private-hub-frontend
+
+# Rebuild the React frontend
+cd /home/ec2-user/private-hub-frontend && npm run build
+
+# Deploy fresh build to Nginx
+sudo rm -rf /usr/share/nginx/html/* && sudo cp -r dist/* /usr/share/nginx/html/
+
+--- 2. BACKEND (NODE API) ---
+# Stop the Node server safely
+sudo pkill node
+
+# Start the Node server in the background (detached)
+nohup /usr/bin/node /home/ec2-user/private-hub-api/server.js > /home/ec2-user/private-hub-api/server.log 2>&1 &
+
+# Stream live API logs (Ctrl+C to exit)
+tail -f /home/ec2-user/private-hub-api/server.log
+
+--- 3. NGINX ---
+# Test config for syntax errors (always run before reload)
+sudo nginx -t
+
+# Reload Nginx (applies config changes without downtime)
+sudo systemctl reload nginx
+
+# Full restart
+sudo systemctl restart nginx
+
+# Check status
+sudo systemctl status nginx
+
+# Edit config
+sudo nano /etc/nginx/nginx.conf
+
+# View access logs
+sudo tail -f /var/log/nginx/access.log
+
+# View error logs
+sudo tail -f /var/log/nginx/error.log
+
+--- 4. DOCKER & REGISTRY ---
+# Check running containers
+docker ps
+
+# View registry logs (watch pushes/pulls in real time)
+docker logs -f private_hub
+
+# Restart the registry container
+docker restart private_hub
+
+# List repositories stored inside the registry
+docker exec -it private_hub ls -l /var/lib/registry/docker/registry/v2/repositories/
+
+# Restart the Docker daemon
+sudo systemctl restart docker
+
+# Run the registry container with persistent volume (first-time setup)
+docker run -d \
+  -p 5000:5000 \
+  --restart unless-stopped \
+  --name private_hub \
+  -v /home/ec2-user/registry-data:/var/lib/registry \
+  registry:2
+
+--- 5. SSL (LET'S ENCRYPT / CERTBOT) ---
+# Manually issue a fresh certificate for the current IP
+CURRENT_IP=$(curl -s ifconfig.me)
+sudo certbot --nginx -d ${CURRENT_IP}.nip.io --non-interactive --agree-tos -m yowahow213@duoley.com --redirect
+
+# Test automatic certificate renewal (dry run — no actual renewal)
+sudo certbot renew --dry-run
+
+--- 6. AUTOMATION ---
+# View the @reboot cron job
+crontab -l
+
+# Edit cron jobs (add @reboot line if missing)
+crontab -e
+# Add this line:
+# @reboot /home/ec2-user/startup.sh >> /home/ec2-user/startup.log 2>&1
+
+# View the startup log (debug boot issues)
+cat /home/ec2-user/startup.log
+
+# Edit the boot script
+nano /home/ec2-user/startup.sh
+
+--- 7. INITIAL EC2 SETUP (first time only) ---
+# Update packages
+sudo yum update -y
+
+# Install dependencies
+sudo yum install git nginx docker python3 augeas-libs jq -y
+
+# Install Node.js (LTS)
+curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+sudo yum install nodejs -y
+
+# Add ec2-user to the docker group
+sudo usermod -aG docker $USER
+
+# Enable and start services
+sudo systemctl enable nginx docker
+sudo systemctl start nginx docker
+
+# Install Certbot (for SSL)
+sudo python3 -m venv /opt/certbot/
+sudo /opt/certbot/bin/pip install --upgrade pip
+sudo /opt/certbot/bin/pip install certbot certbot-nginx
+sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot
+
+# Clone the repo and install dependencies
+git clone <YOUR_REPO_URL> /home/ec2-user/my-hub
+cp -r /home/ec2-user/my-hub/backend /home/ec2-user/private-hub-api
+cp -r /home/ec2-user/my-hub/frontend /home/ec2-user/private-hub-frontend
+cd /home/ec2-user/private-hub-api && npm install
+cd /home/ec2-user/private-hub-frontend && npm install
+
+# Copy startup script and make executable
+cp /home/ec2-user/my-hub/scripts/startup.sh /home/ec2-user/startup.sh
+chmod +x /home/ec2-user/startup.sh
+
+# Add @reboot cron entry
+(crontab -l 2>/dev/null; echo "@reboot /home/ec2-user/startup.sh >> /home/ec2-user/startup.log 2>&1") | crontab -
+
+# Start the Docker registry with persistent storage
+mkdir -p /home/ec2-user/registry-data
+docker run -d \
+  -p 5000:5000 \
+  --restart unless-stopped \
+  --name private_hub \
+  -v /home/ec2-user/registry-data:/var/lib/registry \
+  registry:2
+
+# Run the startup script manually for the first boot
+bash /home/ec2-user/startup.sh
