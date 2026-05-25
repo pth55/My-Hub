@@ -122,7 +122,7 @@ echo "      Frontend deployed."
 
 # 7. Restart Node.js API (kill zombies first, then nohup in background)
 echo "[7/7] Restarting Node API..."
-pkill node || true
+sudo pkill node || true
 sleep 2
 nohup /usr/bin/node /home/ec2-user/private-hub-api/server.js \
   > /home/ec2-user/private-hub-api/server.log 2>&1 &
