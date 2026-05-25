@@ -5,7 +5,7 @@
 # What it does on every EC2 start:
 #   1. Waits for network to be fully up
 #   2. Fetches the new public IP assigned by AWS
-#   3. Writes a clean base nginx.conf for the new <IP>.nip.io domain
+#   3. Writes a clean base nginx.conf for the new <IP>.sslip.io domain
 #   4. Requests a fresh Let's Encrypt SSL certificate via certbot
 #   5. Rebuilds the React frontend so the UI shows the correct domain
 #   6. Copies the build to the Nginx serving directory
@@ -22,7 +22,7 @@ sleep 30
 # 2. Fetch the new public IP dynamically
 echo "[2/7] Fetching public IP..."
 CURRENT_IP=$(curl -s --max-time 10 ifconfig.me)
-MAGIC_DOMAIN="${CURRENT_IP}.nip.io"
+MAGIC_DOMAIN="${CURRENT_IP}.sslip.io"
 echo "      IP: ${CURRENT_IP}  Domain: ${MAGIC_DOMAIN}"
 
 # 3. Write a clean base nginx.conf for the new domain
@@ -89,23 +89,28 @@ NGINXEOF
 sudo nginx -t && sudo systemctl restart nginx
 echo "      Nginx restarted with base config."
 
-# 4. Request a fresh SSL certificate for the new nip.io domain
+# 4. Request a fresh SSL certificate for the new sslip.io domain
 #    --redirect makes certbot automatically add the HTTP→HTTPS redirect block
+#    Failure is non-fatal — the site still works over HTTP if cert issuance fails
 echo "[4/7] Requesting Let's Encrypt certificate for ${MAGIC_DOMAIN}..."
-sudo certbot --nginx \
+if sudo certbot --nginx \
   -d "${MAGIC_DOMAIN}" \
   --non-interactive \
   --agree-tos \
   -m yowahow213@duoley.com \
-  --redirect
-echo "      SSL certificate installed."
+  --redirect; then
+  echo "      SSL certificate installed."
+else
+  echo "      WARNING: certbot failed — continuing without SSL. Site will be HTTP only."
+  echo "      Re-run 'bash ~/startup.sh' later to retry SSL."
+fi
 
 # 5. Rebuild the React frontend
 #    This bakes window.location.hostname into the static JS bundle correctly
 echo "[5/7] Rebuilding React frontend..."
 cd /home/ec2-user/private-hub-frontend
 # Fix ownership in case a previous sudo build left root-owned dist/
-chown -R ec2-user:ec2-user /home/ec2-user/private-hub-frontend
+sudo chown -R ec2-user:ec2-user /home/ec2-user/private-hub-frontend
 /usr/bin/npm run build
 echo "      Frontend built."
 
