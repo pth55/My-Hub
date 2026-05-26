@@ -34,7 +34,7 @@ Client (docker push/pull)
                   → ~/registry-data (host volume)
 ```
 
-**Tech stack:** AWS EC2 · Nginx · Docker registry:2 · React + Vite · Node.js/Express · Let's Encrypt (Certbot) · nip.io magic DNS
+**Tech stack:** AWS EC2 · Nginx · Docker registry:2 · React + Vite · Node.js/Express · Let's Encrypt (Certbot) · sslip.io magic DNS
 
 ---
 
@@ -77,14 +77,14 @@ AWS assigns a new public IP every time an EC2 instance restarts. The `@reboot` c
 EC2 boots
    └─ startup.sh runs
          ├─ curl ifconfig.me        → get new public IP
-         ├─ write fresh nginx.conf  → for <NEW_IP>.nip.io
+         ├─ write fresh nginx.conf  → for <NEW_IP>.sslip.io
          ├─ certbot --nginx          → issue new SSL cert, add HTTPS redirect
          ├─ npm run build            → bake new domain into React bundle
          ├─ cp dist/* nginx/html/   → deploy frontend
          └─ nohup node server.js    → start Node API in background
 ```
 
-After ~2 minutes, open `https://<NEW_IP>.nip.io` in your browser.
+After ~2 minutes, open `https://<NEW_IP>.sslip.io` in your browser.
 
 ---
 
@@ -96,14 +96,14 @@ Once the hub is live, use it exactly like Docker Hub — no extra flags needed.
 
 ```bash
 docker build -t my-app:v1 .
-docker tag my-app:v1 <IP>.nip.io/my-app:v1
-docker push <IP>.nip.io/my-app:v1
+docker tag my-app:v1 <IP>.sslip.io/my-app:v1
+docker push <IP>.sslip.io/my-app:v1
 ```
 
 ### Pull an image
 
 ```bash
-docker pull <IP>.nip.io/my-app:v1
+docker pull <IP>.sslip.io/my-app:v1
 ```
 
 The current domain is always shown in the **Documentation** tab of the dashboard.
